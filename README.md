@@ -45,8 +45,5 @@ It uses the CSV file produced by `gsm-labels` to create git merge commits
 for each StarTeam merge.
 
 
-References
-----------
-
   [1]: https://github.com/planestraveler/git-starteam                    "git-starteam"
   [2]: https://github.com/patrick-higgins/git-starteam/tree/label-dumper "label-dumper"
