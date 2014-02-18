@@ -15,7 +15,7 @@ See `gsm.sh` for an example of how to use these programs together.
 Installation
 ------------
 
-First, [install Go] [3] if you don't already have version 1 or later. Then
+First, [install Go] [2] if you don't already have version 1 or later. Then
 run these two commands to install the git-starteam-merges programs:
 
     $ go get github.com/patrick-higgins/git-starteam-merges/gsm-labels
@@ -25,12 +25,10 @@ Dumping Labels
 --------------
 
 These programs operate on a dump of labels created by the
-`org.sync.LabelDumper` program from the [label-dumper] [2] branch of
-git-starteam. It is assumed that you have already used git-starteam to
-import your StarTeam project into git, so you should be familiar with
-how to build git-starteam from source and have all the jars needed by
-it. You will need to build the [label-dumper] [2] branch until it has
-been merged into the official git-starteam project.
+`org.sync.LabelDumper` program from [git-starteam] [1]. It is assumed that
+you have already used git-starteam to import your StarTeam project
+into git, so you should be familiar with how to build git-starteam
+from source and have all the jars needed by it.
 
 gsm-labels
 ----------
@@ -55,5 +53,4 @@ for each StarTeam merge.
 
 
   [1]: https://github.com/planestraveler/git-starteam                    "git-starteam"
-  [2]: https://github.com/patrick-higgins/git-starteam/tree/label-dumper "label-dumper"
-  [3]: http://golang.org/doc/install                                     "install Go"
+  [2]: http://golang.org/doc/install                                     "install Go"
