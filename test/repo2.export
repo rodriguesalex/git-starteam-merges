@@ -1,0 +1,195 @@
+blob
+mark :1
+data 8
+initial
+
+reset refs/tags/a.Merge-to-b-1
+commit refs/tags/a.Merge-to-b-1
+mark :2
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367434 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367434 -0700
+data 8
+initial
+M 100644 :1 test.txt
+
+blob
+mark :3
+data 15
+initial
+master
+
+commit refs/heads/master
+mark :4
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367456 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367456 -0700
+data 14
+master commit
+from :2
+M 100644 :3 test.txt
+
+blob
+mark :5
+data 10
+initial
+c
+
+commit refs/heads/c
+mark :6
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367459 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367459 -0700
+data 9
+c commit
+from :2
+M 100644 :5 test.txt
+
+blob
+mark :7
+data 10
+initial
+b
+
+commit refs/tags/b.Merge-from-a-1
+mark :8
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367478 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367478 -0700
+data 9
+b commit
+from :2
+M 100644 :7 test.txt
+
+blob
+mark :9
+data 12
+initial
+a
+b
+
+commit refs/tags/b.Merge-from-a-1
+mark :10
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367517 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367517 -0700
+data 46
+Merge branch 'a' into b
+
+Conflicts:
+	test.txt
+from :8
+M 100644 :9 test.txt
+
+blob
+mark :11
+data 15
+initial
+a
+b
+b2
+
+commit refs/heads/b
+mark :12
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367656 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367656 -0700
+data 10
+b2 commit
+from :10
+M 100644 :11 test.txt
+
+blob
+mark :13
+data 20
+initial
+a
+b
+c
+a2
+b2
+
+commit refs/heads/b
+mark :14
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367702 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367702 -0700
+data 46
+Merge branch 'a' into b
+
+Conflicts:
+	test.txt
+from :12
+M 100644 :13 test.txt
+
+blob
+mark :15
+data 10
+initial
+a
+
+commit refs/tags/a.Merge-to-b-1
+mark :16
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367481 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367481 -0700
+data 9
+a commit
+from :2
+M 100644 :15 test.txt
+
+blob
+mark :17
+data 12
+initial
+a
+c
+
+commit refs/tags/a.Merge-from-c-1
+mark :18
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367571 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367571 -0700
+data 46
+Merge branch 'c' into a
+
+Conflicts:
+	test.txt
+from :16
+M 100644 :17 test.txt
+
+blob
+mark :19
+data 15
+initial
+a
+c
+a2
+
+commit refs/tags/a.Merge-to-b-2
+mark :20
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367609 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367609 -0700
+data 10
+a2 commit
+from :18
+M 100644 :19 test.txt
+
+blob
+mark :21
+data 18
+initial
+a
+c
+a2
+a3
+
+commit refs/heads/a
+mark :22
+author Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367725 -0700
+committer Patrick Higgins <patrick.allen.higgins@gmail.com> 1393367725 -0700
+data 10
+a3 commit
+from :20
+M 100644 :21 test.txt
+
+reset refs/heads/a
+from :22
+
+reset refs/tags/c.Merge-to-a-1
+from :6
+
+reset refs/tags/b.Merge-from-a-2
+from :14
+
