@@ -17,10 +17,73 @@ var (
 	inFile = flag.String("in", "", "Input CSV file")
 )
 
-var targetToSourceMergeTag map[string]string
-var tagToMark map[string]int = make(map[string]int)
+type TokenHandler interface {
+	HandleToken(*lex.Lexer, io.Writer) error
+}
 
-type filterFunc func(*lex.Lexer, io.Writer) error
+type TagHarvester struct {
+	TagToMark map[string]int64
+}
+
+func (t *TagHarvester) HandleToken(l *lex.Lexer, o io.Writer) error {
+	switch l.Token() {
+	case lex.TagTok:
+		tag := l.Field(1)
+		io.WriteString(o, l.Line())
+		l.Consume()
+		var mark int64
+		_, err := fmt.Sscanf(l.Line(), "from :%d\n", &mark)
+		if err != nil {
+			return fmt.Errorf("invalid 'from' line: %s", l.Line())
+		}
+		t.TagToMark[tag] = mark
+
+		io.WriteString(o, l.Line())
+		l.Consume()
+
+	default:
+		io.WriteString(o, l.Line())
+		l.Consume()
+	}
+	return nil
+}
+
+type MergeAdder struct {
+	MarkToParentMark map[int64]int64
+	Delayed          map[int64]*gitexport.Commit
+}
+
+func (m *MergeAdder) HandleToken(l *lex.Lexer, o io.Writer) error {
+	switch l.Token() {
+	case lex.CommitTok:
+		parser := gitexport.NewLexerParser(l)
+		commit, err := parser.Commit()
+		if err != nil {
+			return err
+		}
+		parentMark := int64(0)
+		ok := false
+		if commit.Mark != 0 {
+			if parentMark, ok = m.MarkToParentMark[commit.Mark]; ok {
+				commit.Merge = append(commit.Merge, fmt.Sprintf(":%d", parentMark))
+			}
+		}
+		if parentMark < commit.Mark {
+			commit.Write(o)
+			if delayedCommit, ok := m.Delayed[commit.Mark]; ok {
+				delayedCommit.Write(o)
+				delete(m.Delayed, commit.Mark)
+			}
+		} else {
+			m.Delayed[parentMark] = commit
+		}
+
+	default:
+		io.WriteString(o, l.Line())
+		l.Consume()
+	}
+	return nil
+}
 
 func passData(l *lex.Lexer, o io.Writer) {
 	data, err := l.ConsumeData()
@@ -36,7 +99,7 @@ func passData(l *lex.Lexer, o io.Writer) {
 	}
 }
 
-func filter(l *lex.Lexer, o io.Writer, fn filterFunc) {
+func filter(l *lex.Lexer, o io.Writer, handler TokenHandler) {
 	for {
 		switch l.Token() {
 		case lex.EOFTok:
@@ -52,7 +115,7 @@ func filter(l *lex.Lexer, o io.Writer, fn filterFunc) {
 			passData(l, o)
 
 		default:
-			err := fn(l, o)
+			err := handler.HandleToken(l, o)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%d: error: %s\n", l.LineNumber(), err)
 				os.Exit(1)
@@ -61,54 +124,8 @@ func filter(l *lex.Lexer, o io.Writer, fn filterFunc) {
 	}
 }
 
-func passOne(l *lex.Lexer, o io.Writer) error {
-	switch l.Token() {
-	case lex.TagTok:
-		tag := l.Field(1)
-		io.WriteString(o, l.Line())
-		l.Consume()
-		var mark int
-		_, err := fmt.Sscanf(l.Line(), "from :%d\n", &mark)
-		if err != nil {
-			return fmt.Errorf("invalid 'from' line: %s", l.Line())
-		}
-		tagToMark[tag] = mark
-
-		io.WriteString(o, l.Line())
-		l.Consume()
-
-	default:
-		io.WriteString(o, l.Line())
-		l.Consume()
-	}
-	return nil
-}
-
-func passTwo(l *lex.Lexer, o io.Writer) error {
-	switch l.Token() {
-	case lex.CommitTok:
-		parser := gitexport.NewLexerParser(l)
-		commit, err := parser.Commit()
-		if err != nil {
-			return err
-		}
-		/*
-			if commit.Mark != 0 {
-				if parent, ok := parentMark[commit.Mark]; ok {
-					commit.Merge = append(commit.Merge, parent)
-				}
-			}
-		*/
-		commit.Write(o)
-
-	default:
-		io.WriteString(o, l.Line())
-		l.Consume()
-	}
-	return nil
-}
-
-func commitParents(file string) (map[string]string, error) {
+// reads the CSV file and returns a mapping from merge target to source tag.
+func readCSV(file string) (map[string]string, error) {
 	in, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -135,7 +152,22 @@ func commitParents(file string) (map[string]string, error) {
 		targetTag := record[2] + "." + record[3]
 		parents[targetTag] = sourceTag
 	}
+
 	return parents, nil
+}
+
+func commitParents(parentTags map[string]string, tagMarks map[string]int64) (map[int64]int64, error) {
+	parentMarks := make(map[int64]int64)
+	for k, v := range parentTags {
+		km, kok := tagMarks[k]
+		vm, vok := tagMarks[v]
+		if kok && vok {
+			parentMarks[km] = vm
+		} else {
+			fmt.Fprintf(os.Stderr, "Missing tag: %v=%v", k, v)
+		}
+	}
+	return parentMarks, nil
 }
 
 func usage() {
@@ -160,27 +192,38 @@ func main() {
 		flag.Usage()
 	}
 
-	var err error
-	targetToSourceMergeTag, err = commitParents(*inFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %v\n", *inFile, err)
-	}
-
 	temp, err := ioutil.TempFile("", "gsm")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "could not create temp file: ", err)
+		os.Exit(1)
 	}
 
-	// First pass builds tagToMark entries
 	l := lex.New(os.Stdin)
-	filter(l, temp, passOne)
+	tagHarvester := &TagHarvester{TagToMark: make(map[string]int64)}
+	filter(l, temp, tagHarvester)
 
 	_, err = temp.Seek(0, 0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "could not seek to beginning of temp file: ", err)
+		os.Exit(1)
 	}
 
-	// Second pass writes merge entries using tagToMark entries
+	parentTags, err := readCSV(*inFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", *inFile, err)
+		os.Exit(1)
+	}
+
+	parentMarks, err := commitParents(parentTags, tagHarvester.TagToMark)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", *inFile, err)
+		os.Exit(1)
+	}
+
+	//fmt.Fprintf(os.Stderr, "tagToMark: %#v\nparentTags: %#v\nparentMarks: %#v\n", tagHarvester.TagToMark, parentTags, parentMarks)
+
+	mergeAdder := &MergeAdder{MarkToParentMark: parentMarks, Delayed: make(map[int64]*gitexport.Commit)}
+
 	l = lex.New(temp)
-	filter(l, os.Stdout, passTwo)
+	filter(l, os.Stdout, mergeAdder)
 }
