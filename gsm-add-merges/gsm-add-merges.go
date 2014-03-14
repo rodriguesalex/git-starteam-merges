@@ -22,7 +22,7 @@ type TokenHandler interface {
 }
 
 type TagHarvester struct {
-	TagToMark map[string]int64
+	TagToMark map[string]int
 }
 
 func (t *TagHarvester) HandleToken(l *lex.Lexer, o io.Writer) error {
@@ -31,7 +31,7 @@ func (t *TagHarvester) HandleToken(l *lex.Lexer, o io.Writer) error {
 		tag := l.Field(1)
 		io.WriteString(o, l.Line())
 		l.Consume()
-		var mark int64
+		var mark int
 		_, err := fmt.Sscanf(l.Line(), "from :%d\n", &mark)
 		if err != nil {
 			return fmt.Errorf("invalid 'from' line: %s", l.Line())
@@ -49,8 +49,8 @@ func (t *TagHarvester) HandleToken(l *lex.Lexer, o io.Writer) error {
 }
 
 type MergeAdder struct {
-	MarkToParentMark map[int64]int64
-	Delayed          map[int64]*gitexport.Commit
+	MarkToParentMark map[int]int
+	Commits          []*gitexport.Commit
 }
 
 func (m *MergeAdder) HandleToken(l *lex.Lexer, o io.Writer) error {
@@ -61,27 +61,74 @@ func (m *MergeAdder) HandleToken(l *lex.Lexer, o io.Writer) error {
 		if err != nil {
 			return err
 		}
-		parentMark := int64(0)
+		parentMark := int(0)
 		ok := false
 		if commit.Mark != 0 {
 			if parentMark, ok = m.MarkToParentMark[commit.Mark]; ok {
 				commit.Merge = append(commit.Merge, fmt.Sprintf(":%d", parentMark))
 			}
 		}
-		if parentMark < commit.Mark {
-			commit.Write(o)
-			if delayedCommit, ok := m.Delayed[commit.Mark]; ok {
-				delayedCommit.Write(o)
-				delete(m.Delayed, commit.Mark)
-			}
-		} else {
-			m.Delayed[parentMark] = commit
+		m.Commits = append(m.Commits, commit)
+
+	case lex.ResetTok:
+		if err := m.WriteCommits(o); err != nil {
+			return err
 		}
+		io.WriteString(o, l.Line())
+		l.Consume()
 
 	default:
 		io.WriteString(o, l.Line())
 		l.Consume()
 	}
+	return nil
+}
+
+func (m *MergeAdder) WriteCommits(o io.Writer) error {
+	if len(m.Commits) == 0 {
+		return nil
+	}
+
+	g := Graph{
+		Vertices: make([]Vertex, len(m.Commits)+1),
+	}
+
+	for _, c := range m.Commits {
+		if c.Mark == 0 {
+			c.Write(o)
+		} else {
+			var mark int
+			if c.From != "" {
+				fmt.Sscanf(c.From, ":%d", &mark)
+				g.AddEdge(c.Mark, mark)
+				//fmt.Fprintf(temp, "%d %d\n", mark, c.Mark)
+			}
+			for _, merge := range c.Merge {
+				fmt.Sscanf(merge, ":%d", &mark)
+				g.AddEdge(c.Mark, mark)
+				//fmt.Fprintf(temp, "%d %d\n", mark, c.Mark)
+			}
+		}
+	}
+
+	marks, err := TopoSort(g)
+	if err != nil {
+		return fmt.Errorf("Could not sort commits: %v", err)
+	}
+
+NextMark:
+	for _, mark := range marks {
+		// TODO: use indexed lookup
+		for _, c := range m.Commits {
+			if c.Mark == mark {
+				c.Write(o)
+				continue NextMark
+			}
+		}
+	}
+
+	m.Commits = nil
+
 	return nil
 }
 
@@ -115,8 +162,7 @@ func filter(l *lex.Lexer, o io.Writer, handler TokenHandler) {
 			passData(l, o)
 
 		default:
-			err := handler.HandleToken(l, o)
-			if err != nil {
+			if err := handler.HandleToken(l, o); err != nil {
 				fmt.Fprintf(os.Stderr, "%d: error: %s\n", l.LineNumber(), err)
 				os.Exit(1)
 			}
@@ -156,8 +202,8 @@ func readCSV(file string) (map[string]string, error) {
 	return parents, nil
 }
 
-func commitParents(parentTags map[string]string, tagMarks map[string]int64) (map[int64]int64, error) {
-	parentMarks := make(map[int64]int64)
+func commitParents(parentTags map[string]string, tagMarks map[string]int) (map[int]int, error) {
+	parentMarks := make(map[int]int)
 	for k, v := range parentTags {
 		km, kok := tagMarks[k]
 		vm, vok := tagMarks[v]
@@ -199,7 +245,7 @@ func main() {
 	}
 
 	l := lex.New(os.Stdin)
-	tagHarvester := &TagHarvester{TagToMark: make(map[string]int64)}
+	tagHarvester := &TagHarvester{TagToMark: make(map[string]int)}
 	filter(l, temp, tagHarvester)
 
 	_, err = temp.Seek(0, 0)
@@ -222,7 +268,7 @@ func main() {
 
 	//fmt.Fprintf(os.Stderr, "tagToMark: %#v\nparentTags: %#v\nparentMarks: %#v\n", tagHarvester.TagToMark, parentTags, parentMarks)
 
-	mergeAdder := &MergeAdder{MarkToParentMark: parentMarks, Delayed: make(map[int64]*gitexport.Commit)}
+	mergeAdder := &MergeAdder{MarkToParentMark: parentMarks}
 
 	l = lex.New(temp)
 	filter(l, os.Stdout, mergeAdder)

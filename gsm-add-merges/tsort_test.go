@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestAddEdge(t *testing.T) {
+	g := Graph{Vertices: make([]Vertex, 4)}
+	g.AddEdge(0, 1)
+	g.AddEdge(1, 2)
+	g.AddEdge(3, 0)
+	got, err := TopoSort(g)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	want := []int{2, 1, 0, 3}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got=%#v, want=%#v", got, want)
+	}
+}
+
 func TestTopoSortCycle(t *testing.T) {
 	g := Graph{
 		Vertices: []Vertex{

@@ -23,6 +23,10 @@ type Graph struct {
 	Vertices []Vertex
 }
 
+func (g *Graph) AddEdge(src, dst int) {
+	g.Vertices[src].Edges = append(g.Vertices[src].Edges, dst)
+}
+
 type TSort struct {
 	sorted     []int
 	discovered []bool
