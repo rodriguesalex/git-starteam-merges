@@ -15,90 +15,12 @@ const (
 	CROSS
 )
 
-/* Code directly translated from Skiena
-func topsort(g *graph) {
-	initStack(&sorted)
-	for i := 1; i <= g.nvertices; i++ {
-		if !discovered[i] {
-			dfs(g, i)
-		}
-	}
-}
-
-func dfs(g *graph, v int) {
-	var (
-		p *edgenode // temporary pointer
-		y int       // successor vertex
-	)
-
-	if finished {
-		return
-	}
-
-	discovered[v] = true
-	time++
-	entryTime[v] = time
-
-	processVertexEarly(v)
-
-	p = g.edges[v]
-	for p != nil {
-		y = p.y
-		if !discovered[y] {
-			parent[y] = v
-			processEdge(v, y)
-			dfs(g, y)
-		} else if !processed[y] {
-			processEdge(v, y)
-		}
-
-		if finished {
-			return
-		}
-
-		p = p.next
-	}
-
-	processVertexLate(v)
-	time++
-	exitTime[v] = time
-
-	processed[v] = true
-}
-
-func processVertexLate(v int) {
-	push(&sorted, v)
-}
-
-func classifyEdge(x, y int) edgeType {
-	switch {
-	case parent[y] == x:
-		return TREE
-	case discovered[y] && !processed[y]:
-		return BACK
-	case processed[y] && (entryTime[y] > entryTime[x]):
-		return FORWARD
-	case processed[y] && (entryTime[y] < entryTime[x]):
-		return CROSS
-	}
-	return UNKNOWN
-}
-
-var errNotDAG = errors.New("graph is not a DAG")
-
-func processEdge(x, y int) error {
-	if classifyEdge(x, y) == BACK {
-		return errNotDAG
-	}
-}
-*/
-
-type Edges struct {
-	Y []int
+type Vertex struct {
+	Edges []int
 }
 
 type Graph struct {
-	Edges []Edges
+	Vertices []Vertex
 }
 
 type TSort struct {
@@ -107,21 +29,28 @@ type TSort struct {
 	processed  []bool
 }
 
-func TopoSort(g Graph) []int {
+func TopoSort(g Graph) ([]int, error) {
 	t := TSort{
-		discovered: make([]bool, len(g.Edges)),
-		processed:  make([]bool, len(g.Edges)),
+		sorted:     make([]int, 0, len(g.Vertices)),
+		discovered: make([]bool, len(g.Vertices)),
+		processed:  make([]bool, len(g.Vertices)),
 	}
-	t.Sort(g)
-	return t.sorted
+	err := t.Sort(g)
+	if err != nil {
+		return nil, err
+	}
+	return t.sorted, nil
 }
 
-func (t *TSort) Sort(g Graph) {
-	for i, _ := range g.Edges {
+func (t *TSort) Sort(g Graph) error {
+	for i, _ := range g.Vertices {
 		if !t.discovered[i] {
-			t.dfs(g, i)
+			if err := t.dfs(g, i); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 var errNotDAG = errors.New("graph is not a DAG")
@@ -129,7 +58,7 @@ var errNotDAG = errors.New("graph is not a DAG")
 func (t *TSort) dfs(g Graph, v int) error {
 	t.discovered[v] = true
 
-	for _, y := range g.Edges[v].Y {
+	for _, y := range g.Vertices[v].Edges {
 		switch {
 		case !t.discovered[y]:
 			if err := t.dfs(g, y); err != nil {
