@@ -26,9 +26,17 @@ java \
 # Transform flat labels into CSV matching up merge labels.
 gsm-labels -in $LABELS_TMP/labels > $LABELS_TMP/labels.csv
 
-# Rewrite git history to add the merges.
 cd $GIT_REPO
-git filter-branch -f \
-    --parent-filter "gsm-parent-filter -in $LABELS_TMP/labels.csv" \
-    --tag-name-filter cat \
-    -- --all
+
+# Convert the tags to annotated tags (gsm-add-merges requires annotated tags).
+git for-each-ref refs/tags |
+while read obj objtype ref ; do
+    tag="${ref#refs/tags/}"
+    git tag -d "$tag"
+    git tag -a -f -m "$tag" "$tag" "$obj"
+done
+
+# Add the merges.
+git fast-export --no-data --all | \
+    gsm-add-merges -in $LABELS_TMP/labels.csv | \
+    git fast-import --force

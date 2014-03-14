@@ -19,7 +19,7 @@ First, [install Go] [2] if you don't already have version 1 or later. Then
 run these two commands to install the git-starteam-merges programs:
 
     $ go get github.com/patrick-higgins/git-starteam-merges/gsm-labels
-    $ go get github.com/patrick-higgins/git-starteam-merges/gsm-parent-filter
+    $ go get github.com/patrick-higgins/git-starteam-merges/gsm-add-merges
 
 Dumping Labels
 --------------
@@ -44,10 +44,12 @@ creating additional files such as `v4.go` and `v5.go` may be
 appropriate depending on how many different labeling conventions exist
 in your codebase.
 
-gsm-parent-filter
+gsm-add-merges
 -----------------
 
-The `gsm-parent-filter` program is a parent-filter for `git filter-branch`.
+The `gsm-add-merges` program is a filter for `git fast-export` that can
+be piped to `git fast-import --force`.
+
 It uses the CSV file produced by `gsm-labels` to create git merge commits
 for each StarTeam merge.
 
