@@ -210,7 +210,7 @@ func commitParents(parentTags map[string]string, tagMarks map[string]int) (map[i
 		if kok && vok {
 			parentMarks[km] = vm
 		} else {
-			fmt.Fprintf(os.Stderr, "Missing tag: %v=%v", k, v)
+			fmt.Fprintf(os.Stderr, "\nMissing tag: %v=%v", k, v)
 		}
 	}
 	return parentMarks, nil
